@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hospital Suitability | City Planning Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #142c3d;
+      --muted: #5d7180;
+      --line: #d8e2e6;
+      --paper: #ffffff;
+      --canvas: #f2f6f5;
+      --teal: #087f78;
+      --teal-dark: #05665f;
+      --teal-pale: #e4f4f1;
+      --gold: #bc7d22;
+      --shadow: 0 12px 34px rgba(27, 57, 71, .08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); }
+    button, input { font: inherit; }
+    .topbar {
+      background: #fff; border-bottom: 1px solid var(--line); height: 76px;
+      display: flex; align-items: center; justify-content: space-between; padding: 0 30px;
+    }
+    .brand { display: flex; align-items: center; gap: 13px; min-width: 300px; }
+    .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; color: #fff; background: var(--teal); border-radius: 12px; font-size: 24px; font-weight: 700; }
+    .brand-title { font-size: 15px; font-weight: 760; letter-spacing: -.2px; }
+    .brand-sub { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .top-actions { display: flex; align-items: center; gap: 18px; }
+    .demo-tag { border: 1px solid #ead8b6; color: #80530d; background: #fff8e9; border-radius: 20px; padding: 7px 11px; font-size: 10px; font-weight: 750; letter-spacing: .7px; }
+    .tabs { display: flex; align-items: center; gap: 4px; background: #f2f5f4; border-radius: 10px; padding: 4px; }
+    .tab { border: 0; background: transparent; color: #526976; border-radius: 8px; padding: 9px 15px; cursor: pointer; font-size: 12px; font-weight: 650; }
+    .tab.active { background: #fff; color: var(--ink); box-shadow: 0 1px 4px #172e3d1c; }
+    main { max-width: 1500px; padding: 25px 30px 34px; margin: auto; }
+    .page-heading { display: flex; justify-content: space-between; align-items: end; margin: 0 0 18px; gap: 20px; }
+    h1 { margin: 0; letter-spacing: -.7px; font-size: 24px; }
+    .lead { color: var(--muted); margin: 6px 0 0; font-size: 13px; }
+    .city-chip { border: 1px solid var(--line); border-radius: 8px; color: #516876; padding: 8px 11px; background: #fff; font-size: 11px; white-space: nowrap; }
+    .planner-grid { display: grid; grid-template-columns: minmax(480px, 1.55fr) minmax(340px, .85fr); gap: 17px; align-items: start; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); }
+    .map-card { overflow: hidden; }
+    .card-head { min-height: 58px; padding: 15px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8eeee; }
+    .card-title { font-size: 13px; font-weight: 750; }
+    .card-caption { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .map-badge { font-size: 10px; font-weight: 700; border-radius: 15px; background: var(--teal-pale); color: var(--teal-dark); padding: 6px 9px; }
+    .map-wrap { position: relative; background: #edf3f1; }
+    #suitability-map { width: 100%; aspect-ratio: 1000/700; display: block; cursor: crosshair; }
+    .map-bg { fill: #eef4f1; }
+    .green-space { fill: #dfece3; opacity: .9; }
+    .water { fill: #dcebf0; }
+    .road-minor { stroke: #fff; stroke-width: 7; stroke-linecap: round; }
+    .road-major { stroke: #c4b9a5; stroke-width: 10; stroke-linecap: round; }
+    .road-center { stroke: #fff; stroke-width: 5; stroke-linecap: round; }
+    .demand-dot { fill: #e69a50; fill-opacity: .82; stroke: #fff; stroke-width: 2; }
+    .hospital-marker { fill: #fff; stroke: #197fa0; stroke-width: 3; }
+    .hospital-cross { stroke: #197fa0; stroke-width: 3; stroke-linecap: round; }
+    .candidate-marker { fill: var(--teal); stroke: #fff; stroke-width: 4; filter: drop-shadow(0 2px 4px #1238); }
+    .map-label { fill: #526976; font-size: 12px; font-weight: 650; paint-order: stroke; stroke: #f3f7f5; stroke-width: 4px; stroke-linejoin: round; }
+    .map-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 17px; border-top: 1px solid #e8eeee; }
+    .legend-item { display: flex; align-items: center; gap: 7px; color: #566d79; font-size: 10px; }
+    .legend-line { width: 19px; height: 4px; border-radius: 2px; background: #c4b9a5; }
+    .legend-dot { height: 10px; width: 10px; border-radius: 50%; background: #e69a50; border: 1px solid white; box-shadow: 0 0 0 1px #e69a50; }
+    .legend-hospital { height: 12px; width: 12px; border-radius: 50%; border: 2px solid #197fa0; background: white; }
+    .map-footnote { margin-left: auto; font-size: 10px; color: #738591; }
+    .results-card { min-height: 540px; }
+    .results-body { padding: 18px; }
+    .profile-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 17px; }
+    .profile-label { color: var(--muted); font-size: 11px; }
+    .profile-value { font-weight: 750; font-size: 11px; }
+    .score-empty { min-height: 210px; border: 1px dashed #cbd8da; border-radius: 11px; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 24px; background: #fbfdfc; }
+    .empty-icon { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: var(--teal); background: var(--teal-pale); margin: 0 auto 12px; font-size: 20px; }
+    .empty-title { color: var(--ink); font-size: 13px; font-weight: 730; margin-bottom: 5px; }
+    .empty-copy { font-size: 11px; line-height: 1.5; max-width: 230px; }
+    .score-result { display: none; }
+    .score-hero { display: flex; align-items: center; gap: 16px; background: #f2faf8; border: 1px solid #d9eeea; border-radius: 12px; padding: 15px; }
+    .score-number { width: 72px; height: 72px; flex: 0 0 72px; display: grid; place-items: center; border: 5px solid #73c9b6; border-radius: 50%; background: white; color: var(--teal-dark); font-size: 21px; font-weight: 800; }
+    .score-label { font-size: 13px; font-weight: 760; }
+    .score-location { color: var(--muted); font-size: 10px; margin-top: 5px; }
+    .score-summary { font-size: 10px; line-height: 1.45; color: #455e6b; margin-top: 6px; }
+    .section-label { font-size: 10px; color: #607681; font-weight: 750; letter-spacing: .55px; text-transform: uppercase; margin: 19px 0 10px; }
+    .factor-row { display: grid; grid-template-columns: minmax(125px, 1fr) 40px 65px; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #edf1f2; }
+    .factor-name { font-size: 10px; color: #304b5a; line-height: 1.3; }
+    .factor-weight { color: #607681; font-size: 9px; text-align: right; }
+    .factor-value { text-align: right; font-size: 10px; font-weight: 750; }
+    .factor-bar { height: 4px; background: #e8efed; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+    .factor-bar i { display: block; height: 100%; border-radius: 4px; background: #49aa96; }
+    .plain-policy { background: #f7f9f8; border-radius: 10px; padding: 12px; color: #455d69; font-size: 10px; line-height: 1.55; }
+    .plain-policy strong { color: var(--ink); }
+    .notice { margin-top: 13px; border-left: 3px solid #d5a348; background: #fff9ed; color: #765820; padding: 10px 11px; font-size: 9px; line-height: 1.45; }
+    .hidden { display: none !important; }
+    .policy-card { max-width: 1000px; margin: 0 auto; padding: 22px; }
+    .policy-top { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
+    .policy-top h2 { font-size: 16px; margin: 0; }
+    .policy-top p { max-width: 690px; color: var(--muted); font-size: 12px; line-height: 1.55; margin: 7px 0 0; }
+    .reference-box { padding: 12px 14px; background: #f3f8f7; border: 1px solid #dceae7; border-radius: 10px; min-width: 195px; }
+    .reference-box span { display: block; color: var(--muted); font-size: 10px; }
+    .reference-box strong { display: block; margin-top: 5px; font-size: 12px; }
+    .weight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; margin: 20px 0 5px; }
+    .weight-field { padding: 13px 0; border-top: 1px solid #e9eeee; }
+    .weight-field label { font-weight: 680; font-size: 11px; }
+    .weight-field p { color: var(--muted); font-size: 10px; line-height: 1.45; margin: 5px 0 9px; }
+    .input-row { display: flex; align-items: center; gap: 8px; }
+    .input-row input { width: 100px; border: 1px solid #cad7d9; border-radius: 7px; padding: 8px 9px; color: var(--ink); font-size: 12px; }
+    .input-row small { color: #788b94; font-size: 10px; }
+    .policy-actions { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e9eeee; padding-top: 16px; margin-top: 12px; gap: 14px; }
+    .policy-state { color: var(--muted); font-size: 10px; }
+    .button-row { display: flex; gap: 8px; }
+    .button { border: 1px solid #cad7d9; border-radius: 8px; background: white; color: #385362; padding: 9px 13px; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .button:hover { background: #f6faf9; }
+    .button.primary { background: var(--teal); color: #fff; border-color: var(--teal); }
+    .button.primary:hover { background: var(--teal-dark); }
+    .message { color: var(--teal-dark); font-size: 10px; margin-top: 12px; min-height: 16px; }
+    .error { color: #ad3d2d; }
+    .policy-preview { margin-top: 20px; background: #f7f9f8; border-radius: 10px; padding: 15px; }
+    .policy-preview h3 { margin: 0 0 8px; font-size: 11px; }
+    .policy-preview p { margin: 0; color: #4c6470; font-size: 11px; line-height: 1.65; }
+    footer { max-width: 1500px; padding: 0 30px 20px; margin: auto; color: #71828b; font-size: 9px; line-height: 1.5; }
+    @media (max-width: 980px) {
+      main { padding: 20px; }
+      .planner-grid { grid-template-columns: 1fr; }
+      .results-card { min-height: 0; }
+      .results-body { max-width: none; }
+      footer { padding: 0 20px 18px; }
+    }
+    @media (max-width: 640px) {
+      .topbar { padding: 0 14px; height: 66px; }
+      .brand { min-width: auto; gap: 8px; }
+      .brand-mark { height: 32px; width: 32px; }
+      .brand-title { font-size: 12px; }
+      .brand-sub { display: none; }
+      .demo-tag { display: none; }
+      .tab { padding: 8px 10px; font-size: 10px; }
+      main { padding: 16px 12px 24px; }
+      .page-heading { align-items: start; flex-direction: column; gap: 10px; }
+      h1 { font-size: 21px; }
+      .planner-grid { grid-template-columns: minmax(0, 1fr); }
+      .map-footnote { margin-left: 0; width: 100%; }
+      .policy-card { padding: 16px; }
+      .policy-top { flex-direction: column; }
+      .reference-box { width: 100%; }
+      .weight-grid { grid-template-columns: 1fr; }
+      .policy-actions { align-items: start; flex-direction: column; }
+      footer { padding: 0 12px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">+</div>
+      <div>
+        <div class="brand-title">Hospital Suitability</div>
+        <div class="brand-sub">City planning decision support</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="demo-tag">ILLUSTRATIVE DEMO</span>
+      <nav class="tabs" aria-label="Application views">
+        <button class="tab active" id="planner-tab" type="button">Planner view</button>
+        <button class="tab" id="policy-tab" type="button">City policy</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section id="planner-page">
+      <div class="page-heading">
+        <div>
+          <h1>Explore hospital locations</h1>
+          <p class="lead">Select a point on the map to see how it scores under the active city policy.</p>
+        </div>
+        <div class="city-chip">Example City · synthetic data</div>
+      </div>
+      <div class="planner-grid">
+        <section class="card map-card" aria-label="Illustrative city map">
+          <div class="card-head">
+            <div><div class="card-title">Candidate location map</div><div class="card-caption">Click anywhere in the map to place a hypothetical hospital</div></div>
+            <span class="map-badge">Network travel time</span>
+          </div>
+          <div class="map-wrap">
+            <svg id="suitability-map" viewBox="0 0 1000 700" role="img" aria-label="Synthetic road network, existing hospitals, and health demand locations">
+              <rect class="map-bg" x="0" y="0" width="1000" height="700"/>
+              <path class="green-space" d="M0 20h112l30 62-20 43H0zm868 532 35-26 97 28v146H842zM600 0h104l-35 45-78-8z"/>
+              <path class="water" d="M0 635c140-34 250-26 359 7s194 43 298 10 219-51 343-18v66H0z"/>
+              <g id="road-layer"></g>
+              <g id="demand-layer"></g>
+              <g id="hospital-layer"></g>
+              <g id="candidate-layer"></g>
+              <text x="75" y="670" class="map-label">Northside</text>
+              <text x="780" y="92" class="map-label">East district</text>
+              <text x="415" y="639" class="map-label">Riverside</text>
+            </svg>
+          </div>
+          <div class="map-legend">
+            <span class="legend-item"><i class="legend-line"></i> Major roads</span>
+            <span class="legend-item"><i class="legend-dot"></i> Health need clusters</span>
+            <span class="legend-item"><i class="legend-hospital"></i> Existing hospitals</span>
+            <span class="map-footnote">Symbol size shows relative synthetic population</span>
+          </div>
+        </section>
+
+        <section class="card results-card" aria-live="polite">
+          <div class="card-head">
+            <div><div class="card-title">Location assessment</div><div class="card-caption">Suitability is relative to the active policy profile</div></div>
+          </div>
+          <div class="results-body">
+            <div class="profile-row">
+              <span class="profile-label">Active policy</span>
+              <span class="profile-value" id="active-profile">Loading…</span>
+            </div>
+            <div class="score-empty" id="empty-result">
+              <div><div class="empty-icon">⌖</div><div class="empty-title">Choose a location</div><div class="empty-copy">Click the map to compare a hypothetical site against local health need, access, and development factors.</div></div>
+            </div>
+            <div class="score-result" id="score-result">
+              <div class="score-hero">
+                <div class="score-number" id="overall-score">—</div>
+                <div>
+                  <div class="score-label">Overall suitability</div>
+                  <div class="score-location" id="location-label"></div>
+                  <div class="score-summary" id="network-summary"></div>
+                </div>
+              </div>
+              <div class="section-label">What shaped this score</div>
+              <div id="factor-list"></div>
+              <div class="section-label">Policy in plain language</div>
+              <div class="plain-policy" id="policy-summary"></div>
+              <div class="notice" id="assumption-notice"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="policy-page" class="hidden">
+      <div class="page-heading">
+        <div><h1>City policy configuration</h1><p class="lead">Adjust how much each planning consideration influences the demonstration score.</p></div>
+        <div class="city-chip">Example City · local demo profile</div>
+      </div>
+      <section class="card policy-card">
+        <div class="policy-top">
+          <div>
+            <h2>Set city priorities</h2>
+            <p>Enter relative weight values for each factor. The system scales them to a 100% total when it scores locations. These values replace the developer reference defaults for this local demo.</p>
+          </div>
+          <div class="reference-box"><span>Reference profile</span><strong>Developer defaults</strong><span id="reference-caption">Loading weights…</span></div>
+        </div>
+        <form id="policy-form">
+          <div class="weight-grid" id="weight-grid"></div>
+          <div class="policy-actions">
+            <div><div class="policy-state" id="policy-state">Loading current profile…</div><div class="message" id="policy-message" role="status"></div></div>
+            <div class="button-row">
+              <button class="button" id="reset-policy" type="button">Restore reference defaults</button>
+              <button class="button primary" type="submit">Save city weights</button>
+            </div>
+          </div>
+        </form>
+        <div class="policy-preview">
+          <h3>How this policy reads</h3>
+          <p id="policy-preview-text">The active priorities will appear here in plain language.</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    Demonstration only. Map features and planning layers are synthetic. Network travel times use static road speeds and nearest-node snapping. This prototype does not include parcel eligibility screening, live or historic traffic, temporary closures, weather, EMS response records, or validated local health data. Scores support comparison; they are not a siting recommendation.
+  </footer>
+
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const mapSvg = $("#suitability-map");
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const descriptions = {
+      health_demand: "Higher values mean more synthetic health need is within reach on the road network.",
+      gravity_catchment: "Higher values mean the new hospital improves access for more residents who are not adequately served by existing hospitals.",
+      access_resilience: "A placeholder for how well roads remain usable during weather and other disruptions.",
+      road_access: "Closer access to the local road network scores higher.",
+      emergency_access: "Closer access to major roads scores higher.",
+      flat_terrain: "Flatter ground scores higher in this synthetic example.",
+      utility_coverage: "Illustrative availability of water and sewer service.",
+      public_transit: "Closer access to a synthetic transit stop scores higher.",
+      land_cost_proxy: "Lower synthetic development intensity scores higher as a land-cost proxy."
+    };
+    let configuration = null;
+    let latestPoint = null;
+    let latestResult = null;
+
+    function el(name, attrs = {}) {
+      const node = document.createElementNS(SVG_NS, name);
+      for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+      return node;
+    }
+
+    function renderMap(data) {
+      const roadLayer = $("#road-layer");
+      for (const road of data.roads) {
+        if (road.major) {
+          roadLayer.append(el("line", {x1: road.x1, y1: road.y1, x2: road.x2, y2: road.y2, class: "road-major"}));
+          roadLayer.append(el("line", {x1: road.x1, y1: road.y1, x2: road.x2, y2: road.y2, class: "road-center"}));
+        } else {
+          roadLayer.append(el("line", {x1: road.x1, y1: road.y1, x2: road.x2, y2: road.y2, class: "road-minor"}));
+        }
+      }
+      const demandLayer = $("#demand-layer");
+      for (const item of data.demand) {
+        demandLayer.append(el("circle", {cx: item.x, cy: item.y, r: 5 + Math.sqrt(item.population) / 14, class: "demand-dot"}));
+      }
+      const hospitalLayer = $("#hospital-layer");
+      for (const item of data.hospitals) {
+        hospitalLayer.append(el("circle", {cx: item.x, cy: item.y, r: 13, class: "hospital-marker"}));
+        hospitalLayer.append(el("line", {x1: item.x - 5, y1: item.y, x2: item.x + 5, y2: item.y, class: "hospital-cross"}));
+        hospitalLayer.append(el("line", {x1: item.x, y1: item.y - 5, x2: item.x, y2: item.y + 5, class: "hospital-cross"}));
+      }
+    }
+
+    function plainPolicy(weights) {
+      const ordered = configuration.criteria
+        .map((item) => ({...item, weight: weights[item.key] || 0}))
+        .sort((a, b) => b.weight - a.weight);
+      const first = ordered.slice(0, 3).filter((item) => item.weight > 0);
+      if (!first.length) return "No factors have a positive weight.";
+      const priorities = first.map((item) => `${item.label} (${Math.round(item.weight * 100)}%)`).join(", ");
+      return `This policy gives the most influence to ${priorities}. It also considers ${ordered.slice(3).filter((item) => item.weight > 0).map((item) => item.label.toLowerCase()).join(", ")}. A larger share means a factor has more influence on the final score.`;
+    }
+
+    function updateProfile(config) {
+      configuration = config;
+      const source = config.is_override ? "City weights" : "Reference defaults";
+      $("#active-profile").textContent = source;
+      $("#policy-state").textContent = config.is_override
+        ? `City override saved · profile revision ${config.revision}`
+        : "Using developer reference defaults";
+      $("#reference-caption").textContent = config.criteria.map((item) => `${item.label}: ${Math.round(config.reference_weights[item.key] * 100)}%`).slice(0, 2).join(" · ") + " · and others";
+
+      const grid = $("#weight-grid");
+      grid.replaceChildren();
+      for (const item of config.criteria) {
+        const field = document.createElement("div");
+        field.className = "weight-field";
+        const label = document.createElement("label");
+        label.htmlFor = `weight-${item.key}`;
+        label.textContent = item.label;
+        const help = document.createElement("p");
+        help.textContent = descriptions[item.key];
+        const row = document.createElement("div");
+        row.className = "input-row";
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.max = "100";
+        input.step = "0.1";
+        input.required = true;
+        input.id = `weight-${item.key}`;
+        input.name = item.key;
+        input.value = (config.active_weights[item.key] * 100).toFixed(1);
+        input.setAttribute("aria-label", `${item.label} relative weight percent`);
+        const unit = document.createElement("small");
+        unit.textContent = `% relative weight`;
+        row.append(input, unit);
+        field.append(label, help, row);
+        grid.append(field);
+      }
+      $("#policy-preview-text").textContent = plainPolicy(config.active_weights);
+      if (latestResult) renderResult(latestResult);
+    }
+
+    function renderResult(result) {
+      latestResult = result;
+      $("#empty-result").style.display = "none";
+      $("#score-result").style.display = "block";
+      $("#overall-score").textContent = Math.round(result.score);
+      $("#location-label").textContent = `Map point ${Math.round(result.x)}, ${Math.round(result.y)}`;
+      $("#network-summary").textContent = result.network_minutes_to_nearest_demand == null
+        ? "No demand cluster is reachable on the demonstration road network."
+        : `Quickest modeled trip to a demand cluster: ${result.network_minutes_to_nearest_demand} minutes`;
+      $("#policy-summary").innerHTML = `<strong>${result.policy_source === "city override" ? "City priorities:" : "Reference priorities:"}</strong> ${plainPolicy(configuration.active_weights)}`;
+      const factors = $("#factor-list");
+      factors.replaceChildren();
+      for (const item of [...result.criteria].sort((a, b) => b.contribution - a.contribution)) {
+        const row = document.createElement("div");
+        row.className = "factor-row";
+        const name = document.createElement("div");
+        name.className = "factor-name";
+        name.textContent = item.label;
+        const bar = document.createElement("div");
+        bar.className = "factor-bar";
+        const fill = document.createElement("i");
+        fill.style.width = `${item.score}%`;
+        bar.append(fill);
+        name.append(bar);
+        const weight = document.createElement("div");
+        weight.className = "factor-weight";
+        weight.textContent = `${item.weight}% weight`;
+        const contribution = document.createElement("div");
+        contribution.className = "factor-value";
+        contribution.textContent = `+${item.contribution}`;
+        row.append(name, weight, contribution);
+        factors.append(row);
+      }
+      $("#assumption-notice").textContent = result.assumptions.join(" ");
+    }
+
+    async function loadConfiguration() {
+      const response = await fetch("/api/config");
+      if (!response.ok) throw new Error("Could not load the policy configuration.");
+      updateProfile(await response.json());
+    }
+
+    async function scorePoint(x, y) {
+      latestPoint = {x, y};
+      const layer = $("#candidate-layer");
+      layer.replaceChildren(el("circle", {cx: x, cy: y, r: 11, class: "candidate-marker"}));
+      const response = await fetch("/api/score", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({x, y})
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not score this location.");
+      renderResult(data);
+    }
+
+    mapSvg.addEventListener("click", async (event) => {
+      const point = mapSvg.createSVGPoint();
+      point.x = event.clientX;
+      point.y = event.clientY;
+      const cursor = point.matrixTransform(mapSvg.getScreenCTM().inverse());
+      try {
+        await scorePoint(cursor.x, cursor.y);
+      } catch (error) {
+        $("#empty-result").style.display = "flex";
+        $("#score-result").style.display = "none";
+        $("#empty-result").innerHTML = `<div><div class="empty-title">Could not score this point</div><div class="empty-copy"></div></div>`;
+        $("#empty-result .empty-copy").textContent = error.message;
+      }
+    });
+
+    $("#planner-tab").addEventListener("click", () => {
+      $("#planner-page").classList.remove("hidden");
+      $("#policy-page").classList.add("hidden");
+      $("#planner-tab").classList.add("active");
+      $("#policy-tab").classList.remove("active");
+    });
+    $("#policy-tab").addEventListener("click", () => {
+      $("#planner-page").classList.add("hidden");
+      $("#policy-page").classList.remove("hidden");
+      $("#policy-tab").classList.add("active");
+      $("#planner-tab").classList.remove("active");
+    });
+
+    $("#policy-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const message = $("#policy-message");
+      message.classList.remove("error");
+      const weights = {};
+      for (const item of configuration.criteria) {
+        weights[item.key] = Number($(`#weight-${item.key}`).value);
+      }
+      try {
+        const response = await fetch("/api/config", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({weights})
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not save policy.");
+        message.textContent = "City weights saved. New and existing map scores now use this profile.";
+        await loadConfiguration();
+        if (latestPoint) await scorePoint(latestPoint.x, latestPoint.y);
+      } catch (error) {
+        message.textContent = error.message;
+        message.classList.add("error");
+      }
+    });
+
+    $("#reset-policy").addEventListener("click", async () => {
+      const message = $("#policy-message");
+      message.classList.remove("error");
+      try {
+        const response = await fetch("/api/config", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({use_defaults: true})
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not restore reference defaults.");
+        message.textContent = "Reference defaults restored and are active.";
+        await loadConfiguration();
+        if (latestPoint) await scorePoint(latestPoint.x, latestPoint.y);
+      } catch (error) {
+        message.textContent = error.message;
+        message.classList.add("error");
+      }
+    });
+
+    Promise.all([fetch("/api/demo").then((response) => response.json()), loadConfiguration()])
+      .then(([mapData]) => renderMap(mapData))
+      .catch((error) => {
+        $("#empty-result").innerHTML = `<div><div class="empty-title">Demo could not start</div><div class="empty-copy"></div></div>`;
+        $("#empty-result .empty-copy").textContent = error.message;
+      });
+  </script>
+</body>
+</html>
